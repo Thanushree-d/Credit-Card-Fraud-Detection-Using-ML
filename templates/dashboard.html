@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Fraud Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-dark text-light">
+
+<div class="container mt-5">
+  <h2>Fraud Analytics Dashboard</h2>
+  <p class="text-muted">Distribution of Fraud vs Legitimate Transactions</p>
+
+  <div class="card p-3 text-dark">
+    <canvas id="fraudChart"></canvas><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard • FraudShield</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: url("{{ url_for('static', filename='img/bg.jpg') }}")
+                  center center / cover no-repeat fixed;
+      color: white;
+    }
+
+    /* NAVBAR */
+    .navbar {
+      background: rgba(0, 0, 0, 0.6);
+      padding: 15px 0;
+    }
+
+    .navbar-brand {
+      color: #fff !important;
+      font-weight: 700;
+      font-size: 20px;
+    }
+
+    .nav-link {
+      color: #fff !important;
+      font-weight: 500;
+      margin-left: 15px;
+    }
+
+    .nav-link:hover {
+      color: #00e5ff !important;
+    }
+
+    /* PAGE WRAPPER */
+    .page {
+      padding-top: 100px; /* space for fixed navbar */
+      padding-bottom: 40px;
+      background: rgba(0,0,0,0.55);
+      min-height: 100vh;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    }
+
+    .card h5 {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .stat-box {
+      text-align: center;
+      padding: 20px;
+      border-radius: 10px;
+      background: #0d6efd;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .stat-box.fraud {
+      background: #dc3545;
+    }
+
+    .stat-box.legit {
+      background: #198754;
+    }
+
+    @media (max-width: 768px) {
+      .page {
+        padding-top: 80px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg fixed-top">
+  <div class="container">
+    <a class="navbar-brand" href="/">FraudShield</a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="/app">App</a></li>
+        <li class="nav-item"><a class="nav-link" href="/history">History</a></li>
+        <li class="nav-item"><a class="nav-link" href="/metrics">Metrics</a></li>
+        <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- PAGE CONTENT -->
+<div class="page">
+  <div class="container">
+    <h2 class="mb-4">📊 Fraud Analytics Dashboard</h2>
+    <p class="text-muted mb-4">Overview of detected fraudulent and legitimate transactions</p>
+
+    <!-- STATS -->
+    <div class="row mb-4">
+      <div class="col-md-4 mb-3">
+        <div class="stat-box">
+          Total Transactions
+          <div class="fs-3">{{ (values | sum) if values else 0 }}</div>
+        </div>
+      </div>
+      <div class="col-md-4 mb-3">
+        <div class="stat-box fraud">
+          Fraudulent
+          <div class="fs-3">
+            {% if labels and values %}
+              {{ values[labels.index('Fraud')] if 'Fraud' in labels else 0 }}
+            {% else %}0{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4 mb-3">
+        <div class="stat-box legit">
+          Legitimate
+          <div class="fs-3">
+            {% if labels and values %}
+              {{ values[labels.index('Legitimate')] if 'Legitimate' in labels else 0 }}
+            {% else %}0{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="card p-4">
+      <h5 class="mb-3">Fraud vs Legitimate Transactions</h5>
+      <canvas id="fraudChart" height="120"></canvas>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const labels = {{ labels|tojson }};
+  const values = {{ values|tojson }};
+
+  if (labels && values) {
+    new Chart(document.getElementById("fraudChart"), {
+      type: "doughnut",
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: ["#dc3545", "#198754"]
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+  }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+  </div>
+
+  <a href="/" class="btn btn-outline-light mt-3">Back</a>
+</div>
+
+<script>
+  const labels = {{ labels|tojson }};
+  const values = {{ values|tojson }};
+
+  new Chart(document.getElementById("fraudChart"), {
+    type: "pie",
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: ["#dc3545", "#198754"]
+      }]
+    }
+  });
+</script>
+
+</body>
+</html>

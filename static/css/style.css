@@ -1,0 +1,20 @@
+/* Global styles */
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f6f9;
+}
+
+/* Card styling */
+.card {
+  border-radius: 12px;
+}
+
+/* Headings */
+h2 {
+  font-weight: 600;
+}
+
+/* Buttons */
+.btn-primary {
+  border-radius: 8px;
+}
