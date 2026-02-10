@@ -23,10 +23,19 @@
       color: white;
     }
 
+    /* Overlay for readability */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: -1;
+    }
+
     /* NAVBAR */
     .navbar {
       background: rgba(0, 0, 0, 0.6);
-      padding: 15px 0;
+      padding: 12px 0;
     }
 
     .navbar-brand {
@@ -49,7 +58,6 @@
     .page {
       padding-top: 100px; /* space for fixed navbar */
       padding-bottom: 40px;
-      background: rgba(0,0,0,0.55);
       min-height: 100vh;
     }
 
@@ -87,12 +95,13 @@
 <body>
 
 <!-- NAVBAR -->
-<nav class="navbar navbar-expand-lg fixed-top">
+<nav class="navbar navbar-expand-lg fixed-top navbar-dark">
   <div class="container">
     <a class="navbar-brand" href="/">FraudShield</a>
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-            data-bs-target="#navbarNav">
+            data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false"
+            aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
@@ -100,7 +109,10 @@
       <ul class="navbar-nav ms-auto">
         <li class="nav-item"><a class="nav-link" href="/dashboard">Dashboard</a></li>
         <li class="nav-item"><a class="nav-link" href="/history">History</a></li>
-        <li class="nav-item"><a class="nav-link" href="/metrics">Metrics</a></li>
+        {% if session.get('role') == 'admin' %}
+  <li class="nav-item"><a class="nav-link" href="/metrics">Metrics</a></li>
+{% endif %}
+
         <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
       </ul>
     </div>
@@ -114,54 +126,98 @@
     <p class="text-center text-muted mb-4">Real-time ML-based Transaction Risk Assessment</p>
 
     {% if session.get('role') == 'admin' %}
-  <div class="row mb-3">
-    {% for name, m in metrics.items() %}
-      <div class="col-md-4 mb-2">
-        <div class="metric-card">
-          <div>{{ name }}</div>
-          <small>Accuracy: {{ m.acc }}</small><br>
-          <small>F1-score: {{ m.f1 }}</small>
+    <div class="row mb-3">
+      {% for name, m in metrics.items() %}
+        <div class="col-md-3 mb-2">
+          <div class="metric-card">
+            <div>{{ name }}</div>
+            <small>Accuracy: {{ m.acc }}</small><br>
+            <small>F1-score: {{ m.f1 }}</small>
+          </div>
         </div>
-      </div>
-    {% endfor %}
-  </div>
-{% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
 
+    <form action="/predict" method="post" class="card p-4 shadow text-dark">
 
-    <!-- Prediction Form -->
-    <div class="card p-4">
-      <form action="/predict" method="post">
-        <div class="mb-2">
-          <label class="form-label">Select Model</label>
-          <select name="model" class="form-select">
-            <option>Auto (Best)</option>
-            <option>Logistic Regression</option>
-            <option>Random Forest</option>
-            <option>SVM</option>
+      {% if session.get('role') == 'admin' %}
+      <label class="form-label">Select Model</label>
+      <select name="model" class="form-select mb-3">
+        <option>Auto (Best)</option>
+        <option>Logistic Regression</option>
+        <option>Random Forest</option>
+        <option>SVM</option>
+      </select>
+      {% else %}
+        <input type="hidden" name="model" value="Auto (Best)">
+      {% endif %}
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Transaction Amount (₹)</label>
+          <input class="form-control" name="amount" type="number" step="any" placeholder="e.g., 149.99" required>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Transaction Time</label>
+          <select class="form-select" name="time">
+            <option value="0.2">Morning</option>
+            <option value="0.5">Afternoon</option>
+            <option value="0.8">Night</option>
           </select>
         </div>
 
-        <div class="row">
-          <div class="col-md-6 mb-2">
-            <input class="form-control" name="f1" placeholder="Feature 1 (e.g., -0.25)" required>
-          </div>
-          <div class="col-md-6 mb-2">
-            <input class="form-control" name="f2" placeholder="Feature 2 (e.g., 1.42)" required>
-          </div>
-          <div class="col-md-6 mb-2">
-            <input class="form-control" name="f3" placeholder="Feature 3 (e.g., 0.88)" required>
-          </div>
-          <div class="col-md-6 mb-2">
-            <input class="form-control" name="f4" placeholder="Amount (e.g., 149.99)" required>
-          </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Merchant Type</label>
+          <select class="form-select" name="merchant">
+            <option value="0.1">Grocery</option>
+            <option value="0.5">Online</option>
+            <option value="0.9">ATM</option>
+          </select>
         </div>
 
-        <button class="btn btn-primary w-100 mt-3">Predict</button>
-      </form>
-    </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Transaction Location</label>
+          <select class="form-select" name="location">
+            <option value="0.1">Domestic</option>
+            <option value="0.9">International</option>
+          </select>
+        </div>
+      </div>
+
+      <small class="text-muted d-block mb-2">
+        ℹ️ These fields simulate transaction attributes. In real systems, features are captured automatically.
+      </small>
+
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary w-100">Predict Fraud Risk</button>
+        <button type="button" class="btn btn-outline-secondary w-100" onclick="fillLegit()">Fill Legit Sample</button>
+        <button type="button" class="btn btn-outline-danger w-100" onclick="fillFraud()">Fill Fraud Sample</button>
+      </div>
+    </form>
   </div>
 </div>
 
+<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Demo Fill Buttons -->
+<script>
+  function fillLegit() {
+    document.querySelector('[name="amount"]').value = 45;
+    document.querySelector('[name="time"]').value = "0.2";
+    document.querySelector('[name="merchant"]').value = "0.1";
+    document.querySelector('[name="location"]').value = "0.1";
+  }
+
+  function fillFraud() {
+    document.querySelector('[name="amount"]').value = 999;
+    document.querySelector('[name="time"]').value = "0.8";
+    document.querySelector('[name="merchant"]').value = "0.9";
+    document.querySelector('[name="location"]').value = "0.9";
+  }
+</script>
+
 </body>
 </html>

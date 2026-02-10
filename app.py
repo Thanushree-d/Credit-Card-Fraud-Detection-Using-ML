@@ -3,7 +3,6 @@ import joblib
 import numpy as np
 import sqlite3
 from datetime import datetime
-import os
 from functools import wraps
 import csv
 from io import StringIO
@@ -23,7 +22,7 @@ MODELS = {
 BEST_MODEL_NAME = "Random Forest"
 scaler = joblib.load("models/scaler.pkl")
 
-# Default fraud threshold (admin can change)
+# Default fraud threshold
 FRAUD_THRESHOLD = 60.0
 
 # -------------------------------
@@ -57,8 +56,10 @@ init_db()
 def log_tx(model, risk, result):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("INSERT INTO history(timestamp, model, risk, result) VALUES (?,?,?,?)",
-                (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), model, risk, result))
+    cur.execute(
+        "INSERT INTO history(timestamp, model, risk, result) VALUES (?,?,?,?)",
+        (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), model, risk, result)
+    )
     conn.commit()
     conn.close()
 
@@ -84,15 +85,14 @@ def ensemble_predict(X):
     preds = []
     probs = []
 
-    for name, model in MODELS.items():
+    for model in MODELS.values():
         p = int(model.predict(X)[0])
         preds.append(p)
         if hasattr(model, "predict_proba"):
             probs.append(model.predict_proba(X)[0][1] * 100)
 
-    final_pred = int(sum(preds) >= 2)  # majority voting
+    final_pred = int(sum(preds) >= 2)
     final_risk = float(np.mean(probs)) if probs else 50.0
-
     return final_pred, final_risk
 
 # -------------------------------
@@ -128,17 +128,18 @@ def login():
         username = request.form.get("username")
         password = request.form.get("password")
 
+        # Admin shortcut
+        if username == "admin" and password == "admin123":
+            session["username"] = "admin"
+            session["role"] = "admin"
+            return redirect(url_for("dashboard"))
+
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
         cur.execute("SELECT role FROM users WHERE username=? AND password=?",
                     (username, password))
         row = cur.fetchone()
         conn.close()
-
-        if username == "admin" and password == "admin123":
-            session["username"] = "admin"
-            session["role"] = "admin"
-            return redirect(url_for("dashboard"))
 
         if row:
             session["username"] = username
@@ -169,14 +170,25 @@ def index():
 @login_required()
 def predict():
     try:
-        features = [float(v) for k, v in request.form.items() if k != "model"]
-    except ValueError:
-        return render_template("result.html", result="Invalid Input", risk=0, badge="danger",
-                               model="N/A", explanation="Please enter valid numeric values.")
+        amount = float(request.form.get("amount"))
+        time_f = float(request.form.get("time"))
+        merchant_f = float(request.form.get("merchant"))
+        location_f = float(request.form.get("location"))
+
+        # Map user-friendly inputs to model features (demo mapping)
+        features = [time_f, merchant_f, location_f, amount]
+    except Exception:
+        return render_template(
+            "result.html",
+            result="Invalid Input",
+            risk=0,
+            badge="danger",
+            model="N/A",
+            explanation="Please enter valid numeric values."
+        )
 
     X = scaler.transform(np.array(features).reshape(1, -1))
-
-    model_choice = request.form.get("model")
+    model_choice = request.form.get("model", "Auto (Best)")
 
     if model_choice == "Auto (Best)":
         pred, risk = ensemble_predict(X)
@@ -190,23 +202,21 @@ def predict():
     result = "Fraud" if risk >= FRAUD_THRESHOLD else "Legitimate"
     badge = "danger" if result == "Fraud" else "success"
 
-    explanation = (
-        "The ensemble model detected unusual transaction behavior across multiple classifiers."
-        if model_name == "Ensemble" else
-        "The selected model detected transaction patterns indicating fraud risk."
-    )
+    explanation = "Risk estimated based on transaction amount, time, merchant type, and location patterns."
 
     log_tx(model_name, round(risk, 2), result)
 
-    return render_template("result.html",
-                           result=result,
-                           risk=round(risk, 2),
-                           badge=badge,
-                           model=model_name,
-                           explanation=explanation)
+    return render_template(
+        "result.html",
+        result=result,
+        risk=round(risk, 2),
+        badge=badge,
+        model=model_name,
+        explanation=explanation
+    )
 
 # -------------------------------
-# Batch CSV Upload
+# Batch CSV Upload (Admin)
 # -------------------------------
 @app.route("/batch", methods=["GET", "POST"])
 @login_required(role="admin")
@@ -223,15 +233,19 @@ def batch_predict():
         for row in reader:
             features = list(map(float, row))
             X = scaler.transform(np.array(features).reshape(1, -1))
-            pred, risk = ensemble_predict(X)
-            results.append({"features": row, "risk": round(risk, 2), "result": "Fraud" if risk >= FRAUD_THRESHOLD else "Legitimate"})
+            _, risk = ensemble_predict(X)
+            results.append({
+                "features": row,
+                "risk": round(risk, 2),
+                "result": "Fraud" if risk >= FRAUD_THRESHOLD else "Legitimate"
+            })
 
         return jsonify(results)
 
     return "<h3>Upload CSV file for batch fraud prediction</h3>"
 
 # -------------------------------
-# Export History
+# Export History (Admin)
 # -------------------------------
 @app.route("/export")
 @login_required(role="admin")
@@ -247,9 +261,8 @@ def export_history():
     writer.writerow(["ID", "Timestamp", "Model", "Risk", "Result"])
     writer.writerows(rows)
 
-    output = si.getvalue()
     return send_file(
-        StringIO(output),
+        StringIO(si.getvalue()),
         mimetype="text/csv",
         as_attachment=True,
         download_name="fraud_history.csv"
@@ -262,7 +275,7 @@ def export_history():
 def api_predict():
     data = request.json.get("features")
     X = scaler.transform(np.array(data).reshape(1, -1))
-    pred, risk = ensemble_predict(X)
+    _, risk = ensemble_predict(X)
     return jsonify({"risk": round(risk, 2), "result": "Fraud" if risk >= FRAUD_THRESHOLD else "Legitimate"})
 
 @app.route("/history")
